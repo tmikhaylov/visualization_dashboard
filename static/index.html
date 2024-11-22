@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Key Metrics Visualizations</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .chart-container {
+            text-align: center;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Key Metrics Visualizations</h1>
+
+    <!-- Chart Containers -->
+    <div class="grid-container">
+        <div class="chart-container">
+            <h2>Average Cost per Square Foot by Location</h2>
+            <canvas id="costPerSqFtChart" width="600" height="300"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Distribution of House Sizes</h2>
+            <canvas id="houseSizesChart" width="600" height="300"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Distribution of House Capacities</h2>
+            <canvas id="houseCapacitiesChart" width="600" height="300"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Volunteer Hours by Project and Task Type</h2>
+            <canvas id="volunteerHoursChart" width="600" height="300"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Income Range Distribution Among Volunteers</h2>
+            <canvas id="incomeRangeChart" width="600" height="300"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>People Impacted by Location</h2>
+            <canvas id="peopleImpactedChart" width="600" height="300"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Community Satisfaction by Location</h2>
+            <canvas id="satisfactionChart" width="600" height="300"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Employment Created vs. Volunteer Contribution</h2>
+            <canvas id="employmentVsContributionChart" width="600" height="300"></canvas>
+        </div>
+    </div>
+
+    <script>
+        async function fetchAndRender() {
+            try {
+                // Fetch data from Flask API
+                const housingResponse = await fetch("/data/housing");
+                const housingData = await housingResponse.json();
+
+                const volunteerResponse = await fetch("/data/volunteers");
+                const volunteerData = await volunteerResponse.json();
+
+                const communityResponse = await fetch("/data/community");
+                const communityData = await communityResponse.json();
+
+                // Chart 1: Average Cost per Square Foot by Location
+                const avgCostData = housingData.reduce((acc, item) => {
+                    const costPerSqFt = item["Cost (USD)"] / item["Size (sq ft)"];
+                    if (!acc[item.Location]) {
+                        acc[item.Location] = { total: 0, count: 0 };
+                    }
+                    acc[item.Location].total += costPerSqFt;
+                    acc[item.Location].count += 1;
+                    return acc;
+                }, {});
+                const avgCostLabels = Object.keys(avgCostData);
+                const avgCostValues = avgCostLabels.map(
+                    loc => avgCostData[loc].total / avgCostData[loc].count
+                );
+                new Chart(document.getElementById("costPerSqFtChart"), {
+                    type: "bar",
+                    data: {
+                        labels: avgCostLabels,
+                        datasets: [{
+                            label: "Cost per Sq Ft (USD)",
+                            data: avgCostValues,
+                            backgroundColor: "rgba(75, 192, 192, 0.6)"
+                        }]
+                    },
+                    options: { responsive: false, maintainAspectRatio: false }
+                });
+
+                // Chart 2: Distribution of House Sizes
+                const houseSizes = housingData.map(item => item["Size (sq ft)"]);
+                new Chart(document.getElementById("houseSizesChart"), {
+                    type: "bar",
+                    data: {
+                        labels: houseSizes,
+                        datasets: [{
+                            label: "House Sizes (sq ft)",
+                            data: houseSizes,
+                            backgroundColor: "rgba(153, 102, 255, 0.6)"
+                        }]
+                    },
+                    options: { responsive: false, maintainAspectRatio: false }
+                });
+
+                // Chart 3: Distribution of House Capacities
+                const houseCapacities = housingData.map(item => item["Capacity (People)"]);
+                new Chart(document.getElementById("houseCapacitiesChart"), {
+                    type: "bar",
+                    data: {
+                        labels: houseCapacities,
+                        datasets: [{
+                            label: "House Capacities (People)",
+                            data: houseCapacities,
+                            backgroundColor: "rgba(54, 162, 235, 0.6)"
+                        }]
+                    },
+                    options: { responsive: false, maintainAspectRatio: false }
+                });
+
+                // Chart 4: Volunteer Hours by Project and Task Type
+                const volunteerHours = volunteerData.reduce((acc, item) => {
+                    if (!acc[item["Project ID"]]) acc[item["Project ID"]] = {};
+                    acc[item["Project ID"]][item["Task Type"]] =
+                        (acc[item["Project ID"]][item["Task Type"]] || 0) + item["Engagement Hours (Monthly)"];
+                    return acc;
+                }, {});
+                const volunteerLabels = Object.keys(volunteerHours);
+                const volunteerTaskTypes = ["Construction", "Logistics", "Community Outreach"];
+                const datasets = volunteerTaskTypes.map(taskType => ({
+                    label: taskType,
+                    data: volunteerLabels.map(id => volunteerHours[id][taskType] || 0),
+                    backgroundColor: `rgba(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255}, 0.6)`
+                }));
+                new Chart(document.getElementById("volunteerHoursChart"), {
+                    type: "bar",
+                    data: { labels: volunteerLabels, datasets },
+                    options: { responsive: false, maintainAspectRatio: false }
+                });
+
+                // Chart 5: Income Range Distribution Among Volunteers
+                const incomeRanges = ["<30k", "30k-50k", "50k-70k", "70k-100k", ">100k"];
+                const incomeCounts = incomeRanges.map(range =>
+                    volunteerData.filter(item => item["Income Range"] === range).length
+                );
+                new Chart(document.getElementById("incomeRangeChart"), {
+                    type: "bar",
+                    data: {
+                        labels: incomeRanges,
+                        datasets: [{
+                            label: "Number of Volunteers",
+                            data: incomeCounts,
+                            backgroundColor: "rgba(255, 206, 86, 0.6)"
+                        }]
+                    },
+                    options: { responsive: false, maintainAspectRatio: false }
+                });
+
+                // Chart 6: People Impacted by Location
+                const peopleImpactedData = communityData.reduce((acc, item) => {
+                    if (!acc[item.Location]) acc[item.Location] = 0;
+                    acc[item.Location] += item["People Impacted"];
+                    return acc;
+                }, {});
+                const peopleImpactedLabels = Object.keys(peopleImpactedData);
+                const peopleImpactedValues = Object.values(peopleImpactedData);
+                new Chart(document.getElementById("peopleImpactedChart"), {
+                    type: "bar",
+                    data: {
+                        labels: peopleImpactedLabels,
+                        datasets: [{
+                            label: "People Impacted",
+                            data: peopleImpactedValues,
+                            backgroundColor: "rgba(255, 99, 132, 0.6)"
+                        }]
+                    },
+                    options: { responsive: false, maintainAspectRatio: false }
+                });
+
+                // Chart 7: Community Satisfaction by Location
+                const satisfactionData = communityData.reduce((acc, item) => {
+                    if (!acc[item.Location]) acc[item.Location] = { total: 0, count: 0 };
+                    acc[item.Location].total += item["Community Satisfaction"];
+                    acc[item.Location].count += 1;
+                    return acc;
+                }, {});
+                const satisfactionLabels = Object.keys(satisfactionData);
+                const satisfactionValues = satisfactionLabels.map(
+                    loc => satisfactionData[loc].total / satisfactionData[loc].count
+                );
+                new Chart(document.getElementById("satisfactionChart"), {
+                    type: "bar",
+                    data: {
+                        labels: satisfactionLabels,
+                        datasets: [{
+                            label: "Community Satisfaction (1-10)",
+                            data: satisfactionValues,
+                            backgroundColor: "rgba(75, 192, 192, 0.6)"
+                        }]
+                    },
+                    options: { responsive: false, maintainAspectRatio: false }
+                });
+
+                // Chart 8: Employment Created vs. Volunteer Contribution
+                const employmentData = communityData.map(item => ({
+                    x: item["Employment Created"],
+                    y: item["Volunteer Contribution (Hours)"]
+                }));
+                new Chart(document.getElementById("employmentVsContributionChart"), {
+                    type: "scatter",
+                    data: {
+                        datasets: [{
+                            label: "Employment vs Contribution",
+                            data: employmentData,
+                            backgroundColor: "rgba(54, 162, 235, 0.6)"
+                        }]
+                    },
+                    options: {
+                        responsive: false,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { title: { display: true, text: "Employment Created" } },
+                            y: { title: { display: true, text: "Volunteer Contribution (Hours)" } }
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error fetching or rendering data:", error);
+            }
+        }
+
+        fetchAndRender();
+    </script>
+</body>
+</html>
