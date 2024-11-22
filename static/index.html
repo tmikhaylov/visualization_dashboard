@@ -80,7 +80,6 @@
     <script>
         async function fetchAndRender() {
             try {
-                // Fetch data from Flask API
                 const housingResponse = await fetch("/data/housing");
                 const housingData = await housingResponse.json();
 
@@ -93,58 +92,90 @@
                 // Chart 1: Average Cost per Square Foot by Location
                 const avgCostData = housingData.reduce((acc, item) => {
                     const costPerSqFt = item["Cost (USD)"] / item["Size (sq ft)"];
-                    if (!acc[item.Location]) {
-                        acc[item.Location] = { total: 0, count: 0 };
-                    }
+                    if (!acc[item.Location]) acc[item.Location] = { total: 0, count: 0 };
                     acc[item.Location].total += costPerSqFt;
                     acc[item.Location].count += 1;
                     return acc;
                 }, {});
                 const avgCostLabels = Object.keys(avgCostData);
-                const avgCostValues = avgCostLabels.map(
-                    loc => avgCostData[loc].total / avgCostData[loc].count
-                );
+                const avgCostValues = avgCostLabels.map(loc => avgCostData[loc].total / avgCostData[loc].count);
                 new Chart(document.getElementById("costPerSqFtChart"), {
                     type: "bar",
                     data: {
                         labels: avgCostLabels,
                         datasets: [{
-                            label: "Cost per Sq Ft (USD)",
+                            label: "Average Cost per Sq Ft (USD)",
                             data: avgCostValues,
                             backgroundColor: "rgba(75, 192, 192, 0.6)"
                         }]
                     },
-                    options: { responsive: false, maintainAspectRatio: false }
+                    options: {
+                        scales: {
+                            x: { title: { display: true, text: "Location" } },
+                            y: { title: { display: true, text: "Cost per Sq Ft (USD)" } }
+                        }
+                    }
                 });
 
                 // Chart 2: Distribution of House Sizes
                 const houseSizes = housingData.map(item => item["Size (sq ft)"]);
+
+                // Create bins based on the range of house sizes
+                const minSize = 0;
+                const maxSize = Math.max(Math.max(...houseSizes), 5000);
+                const binWidth = 500;
+                const binCount = Math.ceil((maxSize - minSize) / binWidth); // Number of bins
+
+                const houseSizeBins = Array.from({ length: binCount }, (_, i) => ({
+                    lower: minSize + i * binWidth,
+                    upper: minSize + (i + 1) * binWidth
+                }));
+
+                const houseSizeFrequencies = houseSizeBins.map(bin =>
+                    houseSizes.filter(size => size >= bin.lower && size < bin.upper).length
+                );
+
                 new Chart(document.getElementById("houseSizesChart"), {
                     type: "bar",
                     data: {
-                        labels: houseSizes,
+                        labels: houseSizeBins.map(
+                            bin => `${Math.round(bin.lower)} - ${Math.round(bin.upper)}`
+                        ),
                         datasets: [{
-                            label: "House Sizes (sq ft)",
-                            data: houseSizes,
+                            label: "Frequency",
+                            data: houseSizeFrequencies,
                             backgroundColor: "rgba(153, 102, 255, 0.6)"
                         }]
                     },
-                    options: { responsive: false, maintainAspectRatio: false }
+                    options: {
+                        scales: {
+                            x: { title: { display: true, text: "Size (sq ft)" } },
+                            y: { title: { display: true, text: "Frequency" } }
+                        }
+                    }
                 });
 
                 // Chart 3: Distribution of House Capacities
-                const houseCapacities = housingData.map(item => item["Capacity (People)"]);
+                const capacityBins = Array.from({ length: 10 }, (_, i) => i + 1); // Bins from 1 to 10
+                const capacityFrequencies = capacityBins.map(bin => {
+                    return housingData.filter(item => item["Capacity (People)"] === bin).length;
+                });
                 new Chart(document.getElementById("houseCapacitiesChart"), {
                     type: "bar",
                     data: {
-                        labels: houseCapacities,
+                        labels: capacityBins.map(bin => `${bin}`),
                         datasets: [{
-                            label: "House Capacities (People)",
-                            data: houseCapacities,
+                            label: "Frequency",
+                            data: capacityFrequencies,
                             backgroundColor: "rgba(54, 162, 235, 0.6)"
                         }]
                     },
-                    options: { responsive: false, maintainAspectRatio: false }
+                    options: {
+                        scales: {
+                            x: { title: { display: true, text: "Capacity (People)" } },
+                            y: { title: { display: true, text: "Frequency" } }
+                        }
+                    }
                 });
 
                 // Chart 4: Volunteer Hours by Project and Task Type
@@ -164,7 +195,12 @@
                 new Chart(document.getElementById("volunteerHoursChart"), {
                     type: "bar",
                     data: { labels: volunteerLabels, datasets },
-                    options: { responsive: false, maintainAspectRatio: false }
+                    options: {
+                        scales: {
+                            x: { title: { display: true, text: "Project ID" } },
+                            y: { title: { display: true, text: "Volunteer Hours" } }
+                        }
+                    }
                 });
 
                 // Chart 5: Income Range Distribution Among Volunteers
@@ -182,40 +218,48 @@
                             backgroundColor: "rgba(255, 206, 86, 0.6)"
                         }]
                     },
-                    options: { responsive: false, maintainAspectRatio: false }
+                    options: {
+                        scales: {
+                            x: { title: { display: true, text: "Income Range" } },
+                            y: { title: { display: true, text: "Count" } }
+                        }
+                    }
                 });
 
                 // Chart 6: People Impacted by Location
-                const peopleImpactedData = communityData.reduce((acc, item) => {
+                const locationImpact = communityData.reduce((acc, item) => {
                     if (!acc[item.Location]) acc[item.Location] = 0;
                     acc[item.Location] += item["People Impacted"];
                     return acc;
                 }, {});
-                const peopleImpactedLabels = Object.keys(peopleImpactedData);
-                const peopleImpactedValues = Object.values(peopleImpactedData);
                 new Chart(document.getElementById("peopleImpactedChart"), {
                     type: "bar",
                     data: {
-                        labels: peopleImpactedLabels,
+                        labels: Object.keys(locationImpact),
                         datasets: [{
                             label: "People Impacted",
-                            data: peopleImpactedValues,
+                            data: Object.values(locationImpact),
                             backgroundColor: "rgba(255, 99, 132, 0.6)"
                         }]
                     },
-                    options: { responsive: false, maintainAspectRatio: false }
+                    options: {
+                        scales: {
+                            x: { title: { display: true, text: "Location" } },
+                            y: { title: { display: true, text: "People Impacted" } }
+                        }
+                    }
                 });
 
                 // Chart 7: Community Satisfaction by Location
-                const satisfactionData = communityData.reduce((acc, item) => {
+                const satisfactionByLocation = communityData.reduce((acc, item) => {
                     if (!acc[item.Location]) acc[item.Location] = { total: 0, count: 0 };
                     acc[item.Location].total += item["Community Satisfaction"];
                     acc[item.Location].count += 1;
                     return acc;
                 }, {});
-                const satisfactionLabels = Object.keys(satisfactionData);
+                const satisfactionLabels = Object.keys(satisfactionByLocation);
                 const satisfactionValues = satisfactionLabels.map(
-                    loc => satisfactionData[loc].total / satisfactionData[loc].count
+                    loc => satisfactionByLocation[loc].total / satisfactionByLocation[loc].count
                 );
                 new Chart(document.getElementById("satisfactionChart"), {
                     type: "bar",
@@ -227,7 +271,12 @@
                             backgroundColor: "rgba(75, 192, 192, 0.6)"
                         }]
                     },
-                    options: { responsive: false, maintainAspectRatio: false }
+                    options: {
+                        scales: {
+                            x: { title: { display: true, text: "Location" } },
+                            y: { title: { display: true, text: "Community Satisfaction (1-10)" } }
+                        }
+                    }
                 });
 
                 // Chart 8: Employment Created vs. Volunteer Contribution
@@ -245,8 +294,6 @@
                         }]
                     },
                     options: {
-                        responsive: false,
-                        maintainAspectRatio: false,
                         scales: {
                             x: { title: { display: true, text: "Employment Created" } },
                             y: { title: { display: true, text: "Volunteer Contribution (Hours)" } }
